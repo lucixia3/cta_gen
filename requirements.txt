@@ -1,0 +1,15 @@
+# Dependencias para generar el CTA (pip install -r requirements.txt).
+# Python 3.10+.
+numpy
+scipy
+nibabel
+scikit-image
+matplotlib
+SimpleITK
+torch            # con CUDA para bank.py / caso.py (NCCT) y el entrenamiento; CPU basta para hybrid.py
+monai            # BasicUNet / SPADEDiffusion / schedulers
+
+# NOTA: `territorios.py` importa `run_case` (R2), un modulo externo del paquete
+# `lesion2ncct_portable` (el banco LDM + colocador de formas del NCCT). No esta en
+# PyPI ni en este repo: hay que tenerlo en el PYTHONPATH aparte. `hybrid.py` (solo CTA)
+# no lo necesita.

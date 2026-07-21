@@ -1,0 +1,29 @@
+# ============================================================================
+# Este repositorio es SOLO CODIGO. Los datos son TC de pacientes reales
+# (donantes del banco, sem/, prep/, dataset*/, .nii.gz, checkpoints, correos)
+# y NUNCA deben subirse. Estrategia whitelist: se ignora TODO por defecto y solo
+# se permiten explicitamente los ficheros de codigo y documentacion.
+# ============================================================================
+*
+
+# --- lo unico que se publica -------------------------------------------------
+!*.py
+!README.md
+!requirements.txt
+!.gitignore
+!LICENSE
+
+# --- por si acaso: nunca, jamas, aunque alguien fuerce ----------------------
+*.nii
+*.nii.gz
+*.npz
+*.npy
+*.pt
+*.pth
+*.ckpt
+*.b64
+*.png
+*.jpg
+*.jpeg
+*.log
+__pycache__/
