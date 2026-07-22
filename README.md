@@ -133,8 +133,8 @@ Tres cosas que la tabla vieja no hacía:
 
 **`caso.py`** — encadena: variante → oclusión → `apagados` → CTA (`hybrid.render`) y
 territorios → máscara → NCCT (`Gen3D` de lesion2ncct). Y convierte al donante en otro
-paciente, que si no los casos salen todos con el mismo árbol (solo hay 6 anatomías):
-reflejo L-R + deformación elástica, con `--no-variar` para desactivarlo.
+paciente, que si no los casos salen todos con el mismo árbol (el banco tiene solo 8
+anatomías): reflejo L-R + deformación elástica, con `--no-variar` para desactivarlo.
 
 ### Deformar el árbol sin romperlo
 
@@ -156,10 +156,12 @@ Dos trampas más, por si se toca:
   roto en todos los donantes). Con un criterio absoluto se rechaza *cualquier* campo y el
   generador acaba devolviendo siempre el donante intacto — que fue exactamente lo que pasó,
   y no se nota: los casos salen bien, solo que todos con el mismo árbol.
-- **La aleatorización depende solo de `(seed, pid)`**, con su propio `rng`. Por eso dos
-  casos que comparten los dos siguen siendo el mismo cerebro (Dice 1.000) y se pueden
-  comparar, aunque ocluyan arterias distintas. Es lo que permite tener variedad *y* pares
-  limpios a la vez.
+- **La aleatorización depende solo de `(seed, pid)`**, con su propio `rng`. Dos casos que
+  comparten los dos salen con el mismo cerebro (Dice 1.000). `batch_casos.py` ahora da a
+  cada caso un `pid` libre y una `seed` única (su índice), así que cada caso cae en un árbol
+  distinto — el par más parecido del lote baja a **Dice ~0.5**, ninguno es copia de otro.
+  (Antes fijaba `pat_cow0_00` y compartía `seed` entre pares para comparar variantes sobre
+  el mismo árbol; esa comparación se cambió por variedad, y `ESCALA` subió a 3.5.)
 
 ### Un detalle que costó: qué cuenta como "apagado"
 
@@ -200,9 +202,12 @@ equivocados, y los 7 pares R/L del árbol coherentes en los 18.
 - El infarto es una **hipodensidad establecida**, no el sutil agudo (delta ~-15 HU con
   `--fuerza 1.5`; con el default el core baja a ~10 HU, bastante oscuro — bájalo a ~0.7
   si se quiere algo más precoz).
-- Solo **6 anatomías** (2 por familia de CoW) tras descartar las de lateralidad
-  incoherente. El reflejo L-R y la deformación elástica dan variedad, pero el parénquima
-  de fondo sigue saliendo de esos 6 cerebros.
+- El caso completo (CTA + NCCT) solo dispone del **banco de 8 donantes** (2 en familia
+  CoW 0, tras descartar los de lateralidad incoherente): el pool de 183 no trae el
+  NCCT+atlas que necesita el territorio. `batch_casos.py` reparte donante + `seed` únicos
+  por caso y sube la deformación, así que ningún par comparte árbol (Dice ≤ ~0.56), pero el
+  parénquima de fondo sigue saliendo de esos 8 cerebros. Para un árbol de verdad distinto
+  por caso **sin NCCT** está `batch_cta.py` (183 donantes, con el mismo defacing).
 - El **CTA se deforma y el NCCT también, pero con campos independientes** (viven en
   espacios distintos). Siguen siendo el mismo paciente en el sentido que importa —el mismo
   donante y la misma lógica de territorio— pero no son comparables vóxel a vóxel, cosa que
@@ -233,6 +238,26 @@ Entrenado hasta la época 107 (`ckpt/gen_last.pt`, reanudable con `train_gen.py
 tiene sentido retomarlo para un modo sintético puro (cráneo y parénquima también
 generados).
 
+## De-identificación (`deface.py`)
+
+El sustrato de las imágenes es un donante **real** (deformado y reflejado), con su cara y
+su cráneo. Un reflejo + una deformación de ~1.5 mm **no** de-identifican: la superficie
+facial de un TC se reconstruye y se reconoce. `deface.py` la elimina, y se aplica a cada
+salida de `caso.py` (CTA + NCCT) y de `batch_cta.py` (CTA):
+
+- **Quita la cara** — borra todo lo anterior al cerebro (piel, nariz, ojos, senos, hueso
+  facial) sin tocar el parénquima ni ningún vaso (la máscara de vasos se protege, dilatada).
+  En el NCCT protege además el **infarto** (es el ground truth). Umbrales por escala de
+  intensidad: CTA en HU (aire −50, hueso 300), NCCT en ventana de cerebro `[0,80]` (aire 10,
+  hueso 60). Verificado: 0 vasos y 0 infartos tocados en los 18 casos del lote.
+- **Re-centra la affine** del CTA al origen, borrando la posición de mesa del escáner que
+  arrastraba la affine del donante. El NCCT se deja en MNI (plantilla estándar, sin PHI).
+- **Guarda la máscara aparte** (`deface_mask.nii.gz`, y `deface_mask_ncct.nii.gz` en el
+  caso completo) — la de-identificación es auditable y reversible.
+
+Los metadatos ya salían limpios (cabecera NIfTI vacía, `.npz` sin PHI): la exposición
+estaba solo en los vóxeles.
+
 ## Datos (209 CTA)
 
 | Fuente | n | Etiquetas | Aporta |
@@ -242,6 +267,18 @@ generados).
 | **ISLES-TUM** `TopCoW_reference\CTA_ISLES2024_TUM` | 26 CT | 15 + pseudo | CTA con oclusión real |
 
 Las 15 clases de TopCoW coinciden exactamente con las 15 primeras de TopAneu.
+
+**Rutas de las carpetas fuente** (en la máquina donde se preparó; están en `prep.py`, var. `DL`):
+
+```
+C:\Users\LBorrego\Downloads\topaneu_deployment\topaneu_deployment                    # TopAneu (58 CT)
+C:\Users\LBorrego\Downloads\Dataset008_Willis\Dataset008_Willis                      # TopCoW  (125 CT)
+C:\Users\LBorrego\Downloads\TopCoW_reference\CTA_ISLES2024_TUM\CTA_ISLES2024_TUM      # ISLES-TUM (26 CT)
+```
+
+`prep.py` las remuestrea al slab canónico de 0.6 mm → `prep/`. Si los datasets están en
+otro sitio, basta cambiar `DL` en `prep.py`. Estos datos **no** se versionan en el repo
+(son TC de pacientes reales); hay que descargarlos por separado de TopCoW / TopAneu / ISLES.
 
 **Por qué el SPADE anterior (`phase1_best.pt`) daba vasos incoherentes**: se entrenaba
 con el label de TopCoW, que solo describe el polígono, así que el modelo tenía que
