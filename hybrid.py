@@ -157,8 +157,14 @@ def render(hu, ves0, ves, thr, jitter=True, rng=None):
         # contraste, con grano propio y el borde fundido con el vaso vecino
         clot = THROMBUS_HU + rng.normal(0, 5.0, hu.shape).astype(np.float32)
         clot = ndi.gaussian_filter(clot, 0.6)
+        # El peso se suaviza para fundir el BORDE con el vaso vecino, pero dentro
+        # de la mascara tiene que valer 1. Los vasos son de 1-2 voxeles y un
+        # gaussiano de sigma 0.8 sobre un tubo asi de fino no llega a 1 NI EN EL
+        # CENTRO (se queda en ~0.5), asi que sin el `maximum` el trombo salia a
+        # 73-208 HU -- medio coagulo, medio contraste -- en vez de a los ~58 de
+        # THROMBUS_HU. Es decir: la etiqueta decia trombo y el voxel no lo era.
         w = ndi.gaussian_filter(thr.astype(np.float32), 0.8)
-        w = np.clip(w * 1.2, 0, 1)
+        w = np.maximum(np.clip(w * 1.2, 0, 1), thr.astype(np.float32))
         out = out * (1 - w) + clot * w
     return out.astype(np.float32)
 

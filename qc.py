@@ -126,7 +126,7 @@ def grid_generate(steps=50, out="qc_grid.png"):
     import model as M
 
     net = G.load_gen()
-    sched = M.scheduler()
+    sched = M.sampler()          # DDIM, no DDPM (ver model.sampler)
     combos = [("CoW completo", None, None),
               ("CoW completo", "R-M1", 0.5),
               ("CoW completo", "R-ICA-C6-C7", 0.95),

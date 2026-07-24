@@ -131,10 +131,27 @@ def denormalize(z):
     return z * NORM_SD + NORM_MU
 
 
+# Umbral real del aire en este pipeline. `prep.py` guarda la imagen ya recortada a
+# HU_WINDOW con `to_unit`, asi que el aire del fondo llega a `semantic_map` a -100
+# EXACTOS: la condicion `hu < -300` de abajo NO se cumple nunca y la clase AIR esta
+# MUERTA en los 209 mapas -- el fondo fuera de la cabeza va etiquetado como SOFT,
+# la misma clase que el parenquima, y por eso el generador pinta textura de tejido
+# sobre el aire.
+#
+# NO se arregla aqui a proposito. Cambiar el umbral mueve el 32% de los voxeles del
+# canal 1 al canal 0, y el canal 0 no lo ha usado nunca ningun modelo entrenado:
+# medido, la perdida sube de 0.046 (epoca 107) a 0.31 (nivel de la epoca 3) y el
+# contraste vaso-parenquima se degrada epoca a epoca. Es tirar el entrenamiento.
+# El aire entra como canal NUEVO inicializado a cero, en `tejidos.AIRE`, que es lo
+# que mantiene el warm-start exacto. Si algun dia se entrena de cero, entonces si:
+# poner `lab[hu <= AIR_HU] = AIR` y quitar AIRE de `tejidos`.
+AIR_HU = -95.0
+
+
 def semantic_map(hu, vessels, aneurysm=None, thrombus=None):
     """Construye el mapa semantico de 41 clases a partir de HU + vasos."""
     lab = np.full(hu.shape, SOFT, np.uint8)
-    lab[hu < -300] = AIR
+    lab[hu < -300] = AIR                 # muerto por diseno; ver AIR_HU arriba
     lab[hu > 500] = BONE
     v = vessels > 0
     lab[v] = VESSEL0 + vessels[v].astype(np.uint8) - 1

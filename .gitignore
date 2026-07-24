@@ -8,6 +8,7 @@
 
 # --- lo unico que se publica -------------------------------------------------
 !*.py
+!*.ps1
 !README.md
 !requirements.txt
 !.gitignore
