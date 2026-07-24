@@ -17,6 +17,48 @@ $py = "C:\Desactivar_Respaldo\ISLES_train_package\.venv\Scripts\python.exe"
 & $py qc.py --labels                      # valida la hemodinámica (sin GPU)
 ```
 
+## Pretrained diffusion generator (HuggingFace)
+
+Besides the real-donor editing pipeline above, there is a **single diffusion model**
+(3D SPADE) that paints a CTA from a semantic map. One model covers any **CoW
+variant × occlusion site** combination, because those conditions are edits of the
+semantic map, not separate model inputs. Weights:
+[`lborrego/gen_cta`](https://huggingface.co/lborrego/gen_cta).
+
+Download the model into `ckpt/` (that is the filename `generate.py` loads by default):
+
+```python
+from huggingface_hub import hf_hub_download
+hf_hub_download("lborrego/gen_cta", "gen_best.pt", local_dir="ckpt")  # -> ckpt/gen_best.pt, 166 MB
+```
+
+Generate one case — from Python:
+
+```python
+from generate import generate
+
+generate(
+    variant="CoW completo",   # see `python generate.py --list`
+    artery="L-M1",            # occlusion site: the vessel disappears distally
+    frac=0.6,                 # occlusion position along the segment (0 proximal .. 1 distal)
+    guidance=1.3,             # vessel intensity (1.0 -> ~66% of real, 1.3 -> matches real)
+    denoise=0.5,              # light parenchyma de-graining (protects vessels/bone)
+    out="cta.nii.gz",
+)
+```
+
+…or from the CLI:
+
+```bash
+python generate.py --variant "CoW completo" --artery L-M1 --frac 0.6 --out cta.nii.gz
+python generate.py --list      # available CoW variants and occludable arteries
+```
+
+Needs a CUDA GPU and the repo code (`model.py`, `common.py`, …) plus
+`requirements.txt`. Writes the CTA (`cta.nii.gz`) and its semantic map
+(`cta_sem.nii.gz`). An **occlusion** is rendered as the *absence of distal contrast*
+(the vessel stops at the occluded point), **not** a hyperdense clot.
+
 ## Lo que hace que funcione: el grafo hemodinámico
 
 `cow_edit.py` trata el polígono como un **grafo de flujo dirigido**. Las fuentes son
