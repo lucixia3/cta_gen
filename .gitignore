@@ -28,3 +28,25 @@
 *.jpeg
 *.log
 __pycache__/
+
+# --- pipeline hibrido/NCCT antiguo: se conserva en local, NO se publica aqui ---
+arbol3d.py
+arreglar_trombo.py
+bank.py
+batch.py
+batch_casos.py
+batch_cta.py
+caso.py
+deface.py
+mip_caso.py
+prep.py
+pseudolabel.py
+qc.py
+qc_caso.py
+register_to_mni.py
+samples2d.py
+samples_caso.py
+screen_infarct.py
+territorios.py
+train_infarct_seg.py
+train_seg.py
